@@ -1,0 +1,54 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cpa-test
+data:
+  config.yaml: |
+    evaluate:
+      type: "shell"
+      timeout: 2500
+      shell:
+        entrypoint: "/bin/sh"
+        logStderr: true
+        command:
+          - "-c"
+          - "/cpa-rabbitmq-repair -mode=evaluate"
+    metric:
+      type: "http"
+      timeout: 2500
+      http:
+        method: "GET"
+        url: "http://prometheus-rabbitmq-exporter:9419/metrics"
+        successCodes:
+          - 200
+        parameterMode: query
+    minReplicas: 0
+    runMode: "per-resource"
+---
+apiVersion: custompodautoscaler.com/v1
+kind: CustomPodAutoscaler
+metadata:
+  name: cpa-test
+spec:
+  template:
+    spec:
+      volumes:
+        - name: volume-config
+          configMap:
+            name: cpa-test
+      containers:
+        - image: 'lqbing/cpa-rabbitmq-repair'
+          imagePullPolicy: Always
+          name: cpa-test
+          volumeMounts:
+            - name: volume-config
+              readOnly: true
+              mountPath: /config.yaml
+              subPath: config.yaml
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: test
+  config:
+    - name: interval
+      value: "30000"
