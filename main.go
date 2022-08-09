@@ -74,10 +74,10 @@ func main() {
 
 	switch *modePtr {
 	case "metric":
-		// log.Println("gathering metrics")
+		log.Println("gathering metrics")
 		getMetrics(stdin)
 	case "evaluate":
-		// log.Println("evaluating metrics")
+		log.Println("evaluating metrics")
 		getEvaluation(stdin)
 	default:
 		log.Fatalf("Unknown command mode: %s", *modePtr)
@@ -113,7 +113,6 @@ func getMetrics(stdin []byte) {
 }
 
 func getEvaluation(stdin []byte) {
-	// log.Println("parsing spec")
 	var spec EvaluateSpec
 	err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(stdin), 10).Decode(&spec)
 	if err != nil {
@@ -141,7 +140,6 @@ func getEvaluation(stdin []byte) {
 	queueName := ""
 	targetReplicaCount := 0
 	deploymentReplicas := 0
-	log.Print("targetReplicaCount ", targetReplicaCount)
 
 	// load queue name, min replica, max replica from annotations
 	if spec.UnstructuredResource.Object["spec"] != nil {
@@ -152,11 +150,11 @@ func getEvaluation(stdin []byte) {
 				case int64:
 					deploymentReplicas = int(replicas)
 				default:
-					log.Println("deployment replicas is unknown type", fmt.Sprintf("%T", replicas))
+					log.Fatalln("deployment replicas is unknown type", fmt.Sprintf("%T", replicas))
 				}
 			}
 		default:
-			log.Println("deploymentSpec is unknown type", fmt.Sprintf("%T", deploymentSpec))
+			log.Fatalln("deploymentSpec is unknown type", fmt.Sprintf("%T", deploymentSpec))
 		}
 	}
 	if spec.UnstructuredResource.Object["metadata"] != nil {
@@ -170,18 +168,18 @@ func getEvaluation(stdin []byte) {
 						case string:
 							queueName = value
 						default:
-							log.Println(annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"], " is unknown type", fmt.Sprintf("%T", value))
+							log.Fatalln(annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"], " is unknown type", fmt.Sprintf("%T", value))
 						}
 					}
 				default:
-					log.Println("annotations is unknown type", fmt.Sprintf("%T", annotations))
+					log.Fatalln("annotations is unknown type", fmt.Sprintf("%T", annotations))
 				}
 			}
 		default:
-			log.Println("metadata is unknown type", fmt.Sprintf("%T", spec.UnstructuredResource.Object["metadata"]))
+			log.Fatalln("metadata is unknown type", fmt.Sprintf("%T", spec.UnstructuredResource.Object["metadata"]))
 		}
 	} else {
-		log.Println("metadata does not exist")
+		log.Fatalln("metadata does not exist")
 	}
 
 	// if queue name does not exist, through error and exit
@@ -195,7 +193,7 @@ func getEvaluation(stdin []byte) {
 	var parser expfmt.TextParser
 	parsed, err := parser.TextToMetricFamilies(strings.NewReader(metric.Value))
 	if err != nil {
-		log.Printf("parser metrics error: %s\n", err)
+		log.Fatalln("parser metrics error: ", err)
 	}
 
 	// get value of rabbitmq_queue_messages with queue name
