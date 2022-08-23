@@ -18,6 +18,8 @@ The CPA autoscales the pod count with the following rabbitmq queue message count
 
 The CPA will get `queue-name` with annotation `repair.rabbitmq.cpa.lqbing.com/queue-name`. (Required)
 
+The CPA will get `replicas-per-message` with annotation `repair.rabbitmq.cpa.lqbing.com/replicas-per-message`.
+
 The CPA `maxReplicas` & `minReplicas` set in config.yaml
 
 The CPA exposes two endpoints:

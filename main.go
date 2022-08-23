@@ -25,6 +25,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jthomperoo/custom-pod-autoscaler/v2/evaluate"
@@ -65,7 +66,6 @@ func main() {
 	stdin, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	// Determine if gathering metrics or evaluating based on flag
@@ -81,7 +81,6 @@ func main() {
 		getEvaluation(stdin)
 	default:
 		log.Fatalf("Unknown command mode: %s", *modePtr)
-		os.Exit(1)
 	}
 }
 
@@ -117,7 +116,6 @@ func getEvaluation(stdin []byte) {
 	err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(stdin), 10).Decode(&spec)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	// Create object from version and kind of piped value
@@ -125,38 +123,20 @@ func getEvaluation(stdin []byte) {
 	resourceRuntime, err := scheme.Scheme.New(resourceGVK)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	// Parse the unstructured k8s resource into the object created, then convert to generic metav1.Object
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(spec.UnstructuredResource.Object, resourceRuntime)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 	spec.Resource = resourceRuntime.(metav1.Object)
 
 	// initial vars
 	queueName := ""
 	targetReplicaCount := 0
-	deploymentReplicas := 0
+	replicasPerMessage := 1.0
 
-	// load queue name, min replica, max replica from annotations
-	if spec.UnstructuredResource.Object["spec"] != nil {
-		switch deploymentSpec := spec.UnstructuredResource.Object["spec"].(type) {
-		case map[string]interface{}:
-			if deploymentSpec["replicas"] != nil {
-				switch replicas := deploymentSpec["replicas"].(type) {
-				case int64:
-					deploymentReplicas = int(replicas)
-				default:
-					log.Fatalln("deployment replicas is unknown type", fmt.Sprintf("%T", replicas))
-				}
-			}
-		default:
-			log.Fatalln("deploymentSpec is unknown type", fmt.Sprintf("%T", deploymentSpec))
-		}
-	}
 	if spec.UnstructuredResource.Object["metadata"] != nil {
 		switch metadatas := spec.UnstructuredResource.Object["metadata"].(type) {
 		case map[string]interface{}:
@@ -168,7 +148,18 @@ func getEvaluation(stdin []byte) {
 						case string:
 							queueName = value
 						default:
-							log.Fatalln(annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"], " is unknown type", fmt.Sprintf("%T", value))
+							log.Fatalln("annotation repair.rabbitmq.cpa.lqbing.com/queue-name value ", annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"], " invalid type ", fmt.Sprintf("%T", value))
+						}
+					}
+					if annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"] != nil {
+						switch value := annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"].(type) {
+						case string:
+							replicasPerMessage, err = strconv.ParseFloat(value, 64)
+							if err != nil {
+								log.Print(err)
+							}
+						default:
+							log.Print("annotation repair.rabbitmq.cpa.lqbing.com/replicas-per-message value ", annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"], " invalid type ", fmt.Sprintf("%T", value))
 						}
 					}
 				default:
@@ -185,7 +176,6 @@ func getEvaluation(stdin []byte) {
 	// if queue name does not exist, through error and exit
 	if queueName == "" {
 		log.Fatalf("annotation repair.rabbitmq.cpa.lqbing.com/queue-name does not exist")
-		os.Exit(1)
 	}
 
 	// parse metric
@@ -209,10 +199,8 @@ func getEvaluation(stdin []byte) {
 			}
 		}
 	}
-	// not scale when deployment turn off
-	if deploymentReplicas == 0 {
-		targetReplicaCount = 0
-	}
+	// replicas per message
+	targetReplicaCount = int(float64(targetReplicaCount) * replicasPerMessage)
 
 	// Build JSON response
 	evaluation := evaluate.Evaluation{
@@ -223,7 +211,6 @@ func getEvaluation(stdin []byte) {
 	output, err := json.Marshal(evaluation)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 	fmt.Print(string(output))
 }

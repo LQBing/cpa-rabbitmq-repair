@@ -7,3 +7,8 @@ default:
 docker: default
 	@echo "=============Building docker images============="
 	docker build -t $(IMAGE) .
+
+dockerp: default
+	@echo "=============Building docker images============="
+	docker build -t $(IMAGE) .
+	docker push $(IMAGE)
