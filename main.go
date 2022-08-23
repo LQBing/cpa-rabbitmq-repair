@@ -193,7 +193,7 @@ func getEvaluation(stdin []byte) {
 				for _, l := range m.Label {
 					if l.GetName() == "queue" && l.GetValue() == queueName {
 						targetReplicaCount = int(m.GetGauge().GetValue())
-						log.Print("current queue ", queueName, " message count ", targetReplicaCount)
+						log.Print("current queue ", queueName, ", message count ", targetReplicaCount, ", replicasPerMessage ", fmt.Sprintf("%f", replicasPerMessage))
 					}
 				}
 			}
