@@ -137,40 +137,17 @@ func getEvaluation(stdin []byte) {
 	targetReplicaCount := 0
 	replicasPerMessage := 1.0
 
-	if spec.UnstructuredResource.Object["metadata"] != nil {
-		switch metadatas := spec.UnstructuredResource.Object["metadata"].(type) {
-		case map[string]interface{}:
-			if metadatas["annotations"] != nil {
-				switch annotations := metadatas["annotations"].(type) {
-				case map[string]interface{}:
-					if annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"] != nil {
-						switch value := annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"].(type) {
-						case string:
-							queueName = value
-						default:
-							log.Fatalln("annotation repair.rabbitmq.cpa.lqbing.com/queue-name value ", annotations["repair.rabbitmq.cpa.lqbing.com/queue-name"], " invalid type ", fmt.Sprintf("%T", value))
-						}
-					}
-					if annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"] != nil {
-						switch value := annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"].(type) {
-						case string:
-							replicasPerMessage, err = strconv.ParseFloat(value, 64)
-							if err != nil {
-								log.Print(err)
-							}
-						default:
-							log.Print("annotation repair.rabbitmq.cpa.lqbing.com/replicas-per-message value ", annotations["repair.rabbitmq.cpa.lqbing.com/replicas-per-message"], " invalid type ", fmt.Sprintf("%T", value))
-						}
-					}
-				default:
-					log.Fatalln("annotations is unknown type", fmt.Sprintf("%T", annotations))
-				}
-			}
-		default:
-			log.Fatalln("metadata is unknown type", fmt.Sprintf("%T", spec.UnstructuredResource.Object["metadata"]))
+	// loop annotations
+	for k, v := range spec.UnstructuredResource.GetAnnotations() {
+		if k == "repair.rabbitmq.cpa.lqbing.com/queue-name" {
+			queueName = v
 		}
-	} else {
-		log.Fatalln("metadata does not exist")
+		if k == "repair.rabbitmq.cpa.lqbing.com/replicas-per-message" {
+			replicasPerMessage, err = strconv.ParseFloat(v, 64)
+			if err != nil {
+				log.Print(err)
+			}
+		}
 	}
 
 	// if queue name does not exist, through error and exit
